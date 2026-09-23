@@ -1,0 +1,32 @@
+name: Build TaaprWare
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Build Solution (Release x86)
+        run: msbuild "TaaprWare V3.sln" /p:Configuration=Release /p:Platform=x86
+
+      - name: Find output DLL
+        shell: pwsh
+        run: |
+          Get-ChildItem -Recurse -Filter *.dll | Where-Object { $_.FullName -match 'Release' } | ForEach-Object { Write-Host $_.FullName }
+
+      - name: Upload DLL artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TaaprWare-DLL
+          path: '**/Release/*.dll'
+          if-no-files-found: error
