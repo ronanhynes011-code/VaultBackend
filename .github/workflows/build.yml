@@ -1,4 +1,4 @@
-name: Build TaaprWare
+name: Build TaaprWare (x64)
 
 on:
   push:
@@ -10,23 +10,46 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout TaaprWare
         uses: actions/checkout@v4
 
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
 
-      - name: Build Solution (Release x86)
-        run: msbuild "TaaprWare V3.sln" /p:Configuration=Release /p:Platform=x86
+      - name: Setup CMake
+        uses: lukka/get-cmake@latest
 
-      - name: Find output DLL
+      - name: Clone Luau source
+        run: git clone --depth 1 https://github.com/luau-lang/luau.git luau-src
+
+      - name: Configure Luau (x64 Release)
+        run: cmake -S luau-src -B luau-build -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build Luau (x64)
+        run: cmake --build luau-build --config Release
+
+      - name: Copy Luau x64 libs into project
         shell: pwsh
         run: |
-          Get-ChildItem -Recurse -Filter *.dll | Where-Object { $_.FullName -match 'Release' } | ForEach-Object { Write-Host $_.FullName }
+          $libs = Get-ChildItem -Path luau-build -Recurse -Filter "Luau.*.lib"
+          $libs | ForEach-Object { Write-Host $_.FullName }
+          $ast = $libs | Where-Object { $_.Name -eq "Luau.Ast.lib" } | Select-Object -First 1
+          $cmp = $libs | Where-Object { $_.Name -eq "Luau.Compiler.lib" } | Select-Object -First 1
+          if (-not $ast) { throw "Luau.Ast.lib not found" }
+          if (-not $cmp) { throw "Luau.Compiler.lib not found" }
+          Copy-Item $ast.FullName "TaaprWare V3\library\Luau.Ast.lib" -Force
+          Copy-Item $cmp.FullName "TaaprWare V3\library\Luau.Compiler.lib" -Force
 
-      - name: Upload DLL artifact
+      - name: Build TaaprWareV3 (x64)
+        run: msbuild "TaaprWare V3.sln" /p:Configuration=Release /p:Platform=x64
+
+      - name: Locate output
+        shell: pwsh
+        run: Get-ChildItem -Recurse -Filter *.dll | ForEach-Object { Write-Host $_.FullName }
+
+      - name: Upload DLL
         uses: actions/upload-artifact@v4
         with:
-          name: TaaprWare-DLL
+          name: TaaprWareV3-x64
           path: '**/Release/*.dll'
           if-no-files-found: error
