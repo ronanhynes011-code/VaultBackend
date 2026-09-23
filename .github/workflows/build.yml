@@ -16,17 +16,22 @@ jobs:
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
 
-      - name: Setup CMake
-        uses: lukka/get-cmake@latest
+      - name: Setup MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Setup Ninja
+        uses: seanmiddleditch/gha-setup-ninja@master
 
       - name: Clone Luau source
         run: git clone --depth 1 https://github.com/luau-lang/luau.git luau-src
 
       - name: Configure Luau (x64 Release)
-        run: cmake -S luau-src -B luau-build -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release
+        run: cmake -S luau-src -B luau-build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL
 
       - name: Build Luau (x64)
-        run: cmake --build luau-build --config Release
+        run: cmake --build luau-build
 
       - name: Copy Luau x64 libs into project
         shell: pwsh
